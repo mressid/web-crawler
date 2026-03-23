@@ -1,0 +1,244 @@
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.topbar {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.topbar h1 {
+  margin: 0 12px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--ink);
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.control label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+input[type='number'],
+select,
+button,
+input[type='text'],
+input[type='file'] {
+  border: 1px solid #2a3d57;
+  background: #0c1523;
+  border-radius: 6px;
+  font-size: 13px;
+  padding: 6px 8px;
+  color: var(--ink);
+}
+
+button {
+  cursor: pointer;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: #0f1a2b;
+  color: var(--ink);
+  border-color: #2a3d57;
+}
+
+button.secondary.tool-active {
+  background: #143347;
+  border-color: var(--accent);
+  color: #d7fbf5;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#focusStats {
+  font-size: 10px;
+  color: var(--ink);
+  background: #102030;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.status.warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.graph-stage {
+  position: relative;
+  min-height: 0;
+}
+
+.cy-view,
+.fg-view {
+  width: 100%;
+  height: calc(100vh - 74px);
+}
+
+.fg-view canvas {
+  cursor: grab;
+}
+
+.fg-view canvas:active {
+  cursor: grabbing;
+}
+
+.hidden {
+  display: none;
+}
+
+.visible {
+  display: block;
+}
+
+#nodeStatsPanel {
+  position: fixed;
+  right: 12px;
+  top: 92px;
+  width: min(380px, 36vw);
+  max-height: calc(100vh - 110px);
+  overflow: auto;
+  background: rgba(10, 17, 28, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(2, 5, 10, 0.55);
+  padding: 12px;
+  z-index: 6;
+  backdrop-filter: blur(4px);
+}
+
+#nodeStatsPanel h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  color: var(--ink);
+}
+
+.stats-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.stats-chip {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #0f1c2d;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.stats-chip strong {
+  display: block;
+  color: var(--ink);
+  font-size: 12px;
+  margin-top: 2px;
+  font-weight: 700;
+}
+
+#nodeStatsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+#nodeStatsTable th,
+#nodeStatsTable td {
+  text-align: left;
+  border-bottom: 1px solid #24354d;
+  padding: 5px 6px;
+  vertical-align: top;
+}
+
+#nodeStatsTable th {
+  color: var(--muted);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: #0a1220;
+  z-index: 1;
+}
+
+#nodeStatsTable td:last-child,
+#nodeStatsTable th:last-child,
+#nodeStatsTable td:nth-child(2),
+#nodeStatsTable th:nth-child(2),
+#nodeStatsTable td:nth-child(3),
+#nodeStatsTable th:nth-child(3),
+#nodeStatsTable td:nth-child(4),
+#nodeStatsTable th:nth-child(4) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+#nodeStatsTable tr.focused-row {
+  background: #2d2012;
+}
+
+.node-url {
+  color: var(--muted);
+  font-size: 10px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+@media (max-width: 900px) {
+  #nodeStatsPanel {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    top: auto;
+    bottom: 8px;
+    max-height: 42vh;
+  }
+
+  .status {
+    margin-left: 0;
+    width: 100%;
+  }
+}

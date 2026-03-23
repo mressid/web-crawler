@@ -1,0 +1,50 @@
+:root {
+  --bg: #070b12;
+  --panel: #0f1724;
+  --ink: #d2deef;
+  --muted: #86a0bf;
+  --accent: #13b8a6;
+  --warn: #ff9f43;
+  --border: #1c2a3d;
+  --panel-alt: #111d2f;
+
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  line-height: 1.4;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme='light'] {
+  --bg: #edf2f8;
+  --panel: #ffffff;
+  --ink: #1f2a37;
+  --muted: #5f7289;
+  --accent: #0b8b7d;
+  --warn: #c96d00;
+  --border: #d2dce8;
+  --panel-alt: #f6f9fd;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--ink);
+  background: radial-gradient(circle at 0% 0%, #112338 0%, var(--bg) 42%);
+}
+
+[data-theme='light'] body {
+  background: radial-gradient(circle at 0% 0%, #d5e5fb 0%, var(--bg) 42%);
+}

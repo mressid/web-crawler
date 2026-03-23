@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crawler Graph Viewer</title>
+  <script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/3d-force-graph"></script>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --accent: #0f766e;
+      --edge: #94a3b8;
+      --node: #0f766e;
+      --node-text: #ffffff;
+      --warn: #b45309;
+      --border: #d1d5db;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 0% 0%, #e2f5f2 0%, var(--bg) 45%);
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .topbar h1 {
+      margin: 0 12px 0 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+    }
+
+    .control label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input[type="number"],
+    select,
+    button,
+    input[type="text"] {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      border-radius: 6px;
+      font-size: 13px;
+      padding: 6px 8px;
+      color: var(--ink);
+    }
+
+    button {
+      cursor: pointer;
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--ink);
+      border-color: #cbd5e1;
+    }
+
+    #status {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    #focusStats {
+      font-size: 10px;
+      color: var(--ink);
+      background: #eef2f7;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #status.warn {
+      color: var(--warn);
+      font-weight: 600;
+    }
+
+    #cy {
+      width: 100%;
+      height: calc(100vh - 74px);
+      background: transparent;
+    }
+
+    #graph3d {
+      width: 100%;
+      height: calc(100vh - 74px);
+      display: none;
+    }
+
+    #nodeStatsPanel {
+      position: fixed;
+      right: 12px;
+      top: 92px;
+      width: min(380px, 36vw);
+      max-height: calc(100vh - 110px);
+      overflow: auto;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 32px rgba(31, 41, 55, 0.12);
+      padding: 12px;
+      z-index: 6;
+      backdrop-filter: blur(4px);
+    }
+
+    #nodeStatsPanel h2 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+    }
+
+    .stats-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .stats-chip {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: #f8fafc;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .stats-chip strong {
+      display: block;
+      color: var(--ink);
+      font-size: 12px;
+      margin-top: 2px;
+      font-weight: 700;
+    }
+
+    #nodeStatsTable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    #nodeStatsTable th,
+    #nodeStatsTable td {
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 5px 6px;
+      vertical-align: top;
+    }
+
+    #nodeStatsTable th {
+      color: var(--muted);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
+    }
+
+    #nodeStatsTable td:last-child,
+    #nodeStatsTable th:last-child,
+    #nodeStatsTable td:nth-child(2),
+    #nodeStatsTable th:nth-child(2),
+    #nodeStatsTable td:nth-child(3),
+    #nodeStatsTable th:nth-child(3),
+    #nodeStatsTable td:nth-child(4),
+    #nodeStatsTable th:nth-child(4) {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    #nodeStatsTable tr.focused-row {
+      background: #fff7ed;
+    }
+
+    .node-url {
+      color: var(--muted);
+      font-size: 10px;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: block;
+    }
+
+    @media (max-width: 900px) {
+      #nodeStatsPanel {
+        position: fixed;
+        right: 8px;
+        left: 8px;
+        width: auto;
+        top: auto;
+        bottom: 8px;
+        max-height: 42vh;
+      }
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <h1>Crawler Graph Viewer</h1>
+
+      <div class="control">
+        <label for="jsonFile">JSON file</label>
+        <input id="jsonFile" type="file" accept=".json,application/json">
+      </div>
+
+      <div class="control">
+        <label for="layout">Layout</label>
+        <select id="layout">
+          <option value="cose">cose</option>
+          <option value="breadthfirst">breadthfirst</option>
+          <option value="concentric">concentric</option>
+          <option value="circle">circle</option>
+          <option value="grid">grid</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="2d">2D</option>
+          <option value="3d">3D</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="maxNodes">Max nodes</label>
+        <input id="maxNodes" type="number" min="50" value="500" step="50">
+      </div>
+
+      <button id="renderBtn">Render</button>
+      <button id="fitBtn" class="secondary">Fit</button>
+      <span class="hint">Expected format: {"graph": {"parent": ["child1", "child2"]}}</span>
+      <span id="focusStats">Focus: none</span>
+
+      <span id="status">Load a JSON file to begin.</span>
+    </div>
+
+    <div id="cy"></div>
+    <div id="graph3d"></div>
+    <aside id="nodeStatsPanel" onscroll="stopEvent(e)" aria-live="polite">
+      <h2>Node Statistics</h2>
+      <div id="nodeStatsSummary" class="stats-summary"></div>
+      <table id="nodeStatsTable">
+        <thead>
+          <tr>
+            <th>Node</th>
+            <th>In</th>
+            <th>Out</th>
+            <th>Inc</th>
+          </tr>
+        </thead>
+        <tbody id="nodeStatsBody">
+          <tr><td colspan="4">Load and render a graph to see node statistics.</td></tr>
+        </tbody>
+      </table>
+    </aside>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const fileInput = document.getElementById("jsonFile");
+    const renderBtn = document.getElementById("renderBtn");
+    const fitBtn = document.getElementById("fitBtn");
+    const layoutSelect = document.getElementById("layout");
+    const maxNodesInput = document.getElementById("maxNodes");
+    const modeSelect = document.getElementById("mode");
+    const cyContainer = document.getElementById("cy");
+    const graph3dContainer = document.getElementById("graph3d");
+    const focusStatsEl = document.getElementById("focusStats");
+    const nodeStatsSummaryEl = document.getElementById("nodeStatsSummary");
+    const nodeStatsBodyEl = document.getElementById("nodeStatsBody");
+    const nodeStatsPanelEl = document.getElementById("nodeStatsPanel");
+
+    let rawData = null;
+    let graph3d = null;
+    let focusedNodeId = null;
+    let activeGraphData = null;
+    let neighborMap = new Map();
+    let nodeStatsMap = new Map();
+
+    const cy = cytoscape({
+      container: document.getElementById("cy"),
+      elements: [],
+      style: [
+        {
+          selector: "node",
+          style: {
+            "background-color": "#0f766e",
+            "label": "",
+            "font-size": 4,
+            "text-wrap": "ellipsis",
+            "text-max-width": 90,
+            "color": "#ffffff",
+            "text-outline-width": 2,
+            "text-outline-color": "#0f766e",
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          selector: "node.hover-label, node.focus-label",
+          style: {
+            "label": "data(label)",
+            "font-size": 4,
+            "text-max-width": 100
+          }
+        },
+        {
+          selector: "edge",
+          style: {
+            "width": 1,
+            "line-color": "#94a3b8",
+            "target-arrow-color": "#94a3b8",
+            "target-arrow-shape": "triangle",
+            "curve-style": "bezier",
+            "arrow-scale": 0.7,
+            "opacity": 0.85
+          }
+        },
+        {
+          selector: ".faded",
+          style: {
+            "opacity": 0.12,
+            "text-opacity": 0.12
+          }
+        },
+        {
+          selector: "edge.faded",
+          style: {
+            "opacity": 0.06
+          }
+        },
+        {
+          selector: ".highlighted",
+          style: {
+            "opacity": 1,
+            "text-opacity": 1
+          }
+        },
+        {
+          selector: "edge.highlighted",
+          style: {
+            "width": 2,
+            "line-color": "#0f766e",
+            "target-arrow-color": "#0f766e",
+            "opacity": 0.95
+          }
+        },
+        {
+          selector: ":selected",
+          style: {
+            "background-color": "#b45309",
+            "line-color": "#b45309",
+            "target-arrow-color": "#b45309"
+          }
+        }
+      ]
+    });
+
+    function stopEvent(evt) {
+      evt.stopPropagation();
+    }
+
+    function shortLabel(url) {
+      try {
+        const u = new URL(url);
+        return (u.pathname && u.pathname !== "/") ? u.pathname : u.hostname;
+      } catch {
+        return String(url);
+      }
+    }
+
+    function setStatus(msg, isWarn = false) {
+      statusEl.textContent = msg;
+      statusEl.classList.toggle("warn", isWarn);
+    }
+
+    function setFocusStats(msg) {
+      focusStatsEl.textContent = msg;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function calculateNodeStats(graphData) {
+      const stats = new Map();
+      if (!graphData) {
+        return stats;
+      }
+
+      for (const node of graphData.nodes) {
+        stats.set(node.id, {
+          id: node.id,
+          inDegree: 0,
+          outDegree: 0,
+          incidentEdges: 0,
+          neighbors: new Set()
+        });
+      }
+
+      for (const link of graphData.links) {
+        const s = edgeEndId(link.source);
+        const t = edgeEndId(link.target);
+        if (!s || !t) {
+          continue;
+        }
+
+        if (!stats.has(s)) {
+          stats.set(s, { id: s, inDegree: 0, outDegree: 0, incidentEdges: 0, neighbors: new Set() });
+        }
+        if (!stats.has(t)) {
+          stats.set(t, { id: t, inDegree: 0, outDegree: 0, incidentEdges: 0, neighbors: new Set() });
+        }
+
+        const sourceStats = stats.get(s);
+        const targetStats = stats.get(t);
+
+        sourceStats.outDegree += 1;
+        targetStats.inDegree += 1;
+        sourceStats.incidentEdges += 1;
+        targetStats.incidentEdges += 1;
+        sourceStats.neighbors.add(t);
+        targetStats.neighbors.add(s);
+      }
+
+      return stats;
+    }
+
+    function updateNodeStatsPanel() {
+      if (!activeGraphData || nodeStatsMap.size === 0) {
+        nodeStatsSummaryEl.innerHTML = "";
+        nodeStatsBodyEl.innerHTML = "<tr><td colspan=\"4\">Load and render a graph to see node statistics.</td></tr>";
+        return;
+      }
+
+      const entries = Array.from(nodeStatsMap.values());
+      const totalNodes = activeGraphData.nodes.length;
+      const totalEdges = activeGraphData.links.length;
+      const sourceCount = entries.filter((x) => x.inDegree === 0).length;
+      const sinkCount = entries.filter((x) => x.outDegree === 0).length;
+      const avgOut = totalNodes ? (totalEdges / totalNodes).toFixed(2) : "0.00";
+      const avgIncident = totalNodes
+        ? (entries.reduce((sum, x) => sum + x.incidentEdges, 0) / totalNodes).toFixed(2)
+        : "0.00";
+
+      nodeStatsSummaryEl.innerHTML = [
+        `<div class=\"stats-chip\">Nodes<strong>${totalNodes}</strong></div>`,
+        `<div class=\"stats-chip\">Edges<strong>${totalEdges}</strong></div>`,
+        `<div class=\"stats-chip\">Avg out-degree<strong>${avgOut}</strong></div>`,
+        `<div class=\"stats-chip\">Avg incident<strong>${avgIncident}</strong></div>`,
+        `<div class=\"stats-chip\">Sources (in=0)<strong>${sourceCount}</strong></div>`,
+        `<div class=\"stats-chip\">Sinks (out=0)<strong>${sinkCount}</strong></div>`
+      ].join("");
+
+      const ranked = entries
+        .sort((a, b) => {
+          if (b.incidentEdges !== a.incidentEdges) {
+            return b.incidentEdges - a.incidentEdges;
+          }
+          return a.id.localeCompare(b.id);
+        })
+        .slice(0, 20);
+
+      nodeStatsBodyEl.innerHTML = ranked.map((node) => {
+        const focusedClass = node.id === focusedNodeId ? "focused-row" : "";
+        return (
+          `<tr class=\"${focusedClass}\">` +
+          `<td><strong>${escapeHtml(shortLabel(node.id))}</strong>` +
+          `<span class=\"node-url\" title=\"${escapeHtml(node.id)}\">${escapeHtml(node.id)}</span></td>` +
+          `<td>${node.inDegree}</td>` +
+          `<td>${node.outDegree}</td>` +
+          `<td>${node.incidentEdges}</td>` +
+          `</tr>`
+        );
+      }).join("");
+    }
+
+    function toElements(payload, maxNodes) {
+      const adjacency = payload && payload.graph;
+      if (!adjacency || typeof adjacency !== "object") {
+        throw new Error("Invalid JSON: missing 'graph' object.");
+      }
+
+      const nodes = new Set();
+      const edges = [];
+
+      for (const [source, targets] of Object.entries(adjacency)) {
+        nodes.add(source);
+        if (!Array.isArray(targets)) {
+          continue;
+        }
+        for (const target of targets) {
+          nodes.add(target);
+          edges.push({ source, target });
+        }
+      }
+
+      const limitedNodes = Array.from(nodes).slice(0, Math.max(1, maxNodes));
+      const allowed = new Set(limitedNodes);
+
+      const nodeElements = limitedNodes.map((id) => ({
+        data: { id, label: shortLabel(id), full: id }
+      }));
+
+      const edgeElements = edges
+        .filter((e) => allowed.has(e.source) && allowed.has(e.target))
+        .map((e, i) => ({
+          data: {
+            id: `e-${i}`,
+            source: e.source,
+            target: e.target
+          }
+        }));
+
+      return {
+        elements: [...nodeElements, ...edgeElements],
+        graphData: {
+          nodes: limitedNodes.map((id) => ({ id, label: shortLabel(id), full: id })),
+          links: edges
+            .filter((e) => allowed.has(e.source) && allowed.has(e.target))
+            .map((e) => ({ source: e.source, target: e.target }))
+        },
+        nodeCount: nodeElements.length,
+        edgeCount: edgeElements.length,
+        fullNodeCount: nodes.size,
+        fullEdgeCount: edges.length
+      };
+    }
+
+    function edgeEndId(end) {
+      if (typeof end === "string") {
+        return end;
+      }
+      if (end && typeof end === "object") {
+        return end.id;
+      }
+      return null;
+    }
+
+    function buildNeighborMap(graphData) {
+      const map = new Map();
+      for (const node of graphData.nodes) {
+        map.set(node.id, new Set());
+      }
+      for (const link of graphData.links) {
+        const s = edgeEndId(link.source);
+        const t = edgeEndId(link.target);
+        if (!s || !t) {
+          continue;
+        }
+        if (!map.has(s)) {
+          map.set(s, new Set());
+        }
+        if (!map.has(t)) {
+          map.set(t, new Set());
+        }
+        map.get(s).add(t);
+        map.get(t).add(s);
+      }
+      return map;
+    }
+
+    function getFocusStats(nodeId) {
+      const totalNodes = activeGraphData ? activeGraphData.nodes.length : 0;
+      const totalEdges = activeGraphData ? activeGraphData.links.length : 0;
+
+      if (!nodeId || !activeGraphData) {
+        return {
+          totalNodes,
+          totalEdges,
+          inDegree: 0,
+          outDegree: 0,
+          incidentEdges: 0,
+          neighborCount: 0
+        };
+      }
+
+      let inDegree = 0;
+      let outDegree = 0;
+      let incidentEdges = 0;
+      const neighbors = new Set();
+
+      for (const link of activeGraphData.links) {
+        const s = edgeEndId(link.source);
+        const t = edgeEndId(link.target);
+        const isOut = s === nodeId;
+        const isIn = t === nodeId;
+
+        if (isOut) {
+          outDegree += 1;
+          if (t) {
+            neighbors.add(t);
+          }
+        }
+
+        if (isIn) {
+          inDegree += 1;
+          if (s) {
+            neighbors.add(s);
+          }
+        }
+
+        if (isOut || isIn) {
+          incidentEdges += 1;
+        }
+      }
+
+      neighbors.delete(nodeId);
+
+      return {
+        totalNodes,
+        totalEdges,
+        inDegree,
+        outDegree,
+        incidentEdges,
+        neighborCount: neighbors.size
+      };
+    }
+
+    function updateFocusStats() {
+      const stats = getFocusStats(focusedNodeId);
+      if (!focusedNodeId) {
+        setFocusStats(
+          `Focus: none | Total nodes: ${stats.totalNodes} | Total edges: ${stats.totalEdges}`
+        );
+        return;
+      }
+
+      setFocusStats(
+        `Focus: ${shortLabel(focusedNodeId)} | in: ${stats.inDegree} | out: ${stats.outDegree} | ` +
+        `incident: ${stats.incidentEdges} | neighbors: ${stats.neighborCount}`
+      );
+    }
+
+    function clear2DFocus() {
+      cy.elements().removeClass("faded highlighted focus-label");
+      focusedNodeId = null;
+      updateFocusStats();
+      updateNodeStatsPanel();
+    }
+
+    function apply2DFocus(nodeId) {
+      const node = cy.getElementById(nodeId);
+      if (!node || node.empty()) {
+        return;
+      }
+
+      cy.elements().removeClass("faded highlighted");
+      cy.elements().addClass("faded");
+
+      const connectedEdges = node.connectedEdges();
+      const relatedNodes = connectedEdges.connectedNodes().union(node);
+
+      relatedNodes.removeClass("faded");
+      relatedNodes.addClass("highlighted");
+      relatedNodes.addClass("focus-label");
+
+      connectedEdges.removeClass("faded");
+      connectedEdges.addClass("highlighted");
+      updateFocusStats();
+      updateNodeStatsPanel();
+    }
+
+    function update3DFocusStyles() {
+      if (!graph3d) {
+        return;
+      }
+
+      const highlighted = focusedNodeId ? (neighborMap.get(focusedNodeId) || new Set()) : new Set();
+
+      graph3d
+        .nodeColor((node) => {
+          if (!focusedNodeId) {
+            return "#0f766e";
+          }
+          if (node.id === focusedNodeId) {
+            return "#b45309";
+          }
+          if (highlighted.has(node.id)) {
+            return "#0f766e";
+          }
+          return "rgba(148, 163, 184, 0.18)";
+        })
+        .linkColor((link) => {
+          if (!focusedNodeId) {
+            return "#94a3b8";
+          }
+          const s = edgeEndId(link.source);
+          const t = edgeEndId(link.target);
+          if (s === focusedNodeId || t === focusedNodeId) {
+            return "#0f766e";
+          }
+          return "rgba(148, 163, 184, 0.12)";
+        })
+        .linkWidth((link) => {
+          if (!focusedNodeId) {
+            return 1;
+          }
+          const s = edgeEndId(link.source);
+          const t = edgeEndId(link.target);
+          return (s === focusedNodeId || t === focusedNodeId) ? 2.5 : 0.4;
+        })
+        .linkOpacity(focusedNodeId ? 0.95 : 0.75);
+
+      graph3d.refresh();
+    }
+
+    function clear3DFocus() {
+      focusedNodeId = null;
+      update3DFocusStyles();
+      updateFocusStats();
+      updateNodeStatsPanel();
+    }
+
+    function render2D(result, layoutName) {
+      cyContainer.style.display = "block";
+      graph3dContainer.style.display = "none";
+      focusedNodeId = null;
+      updateFocusStats();
+      updateNodeStatsPanel();
+
+      cy.elements().remove();
+      cy.add(result.elements);
+      clear2DFocus();
+      cy.layout({
+        name: layoutName,
+        animate: false,
+        fit: true,
+        padding: 40,
+        spacingFactor: 1.1,
+        nodeDimensionsIncludeLabels: false
+      }).run();
+    }
+
+    function render3D(result) {
+      cyContainer.style.display = "none";
+      graph3dContainer.style.display = "block";
+
+      if (!graph3d) {
+        graph3d = ForceGraph3D()(graph3dContainer)
+          .backgroundColor("#f4f6f8")
+          .nodeColor(() => "#0f766e")
+          .nodeRelSize(4)
+          .nodeLabel((node) => node.full)
+          .linkColor(() => "#94a3b8")
+          .linkOpacity(0.75)
+          .onNodeClick((node) => {
+            if (!node || !node.id) {
+              return;
+            }
+            if (focusedNodeId === node.id) {
+              clear3DFocus();
+              setStatus("3D focus cleared.");
+              return;
+            }
+            focusedNodeId = node.id;
+            update3DFocusStyles();
+            setStatus(`Focused (3D): ${node.full}`);
+          })
+          .onBackgroundClick(() => {
+            clear3DFocus();
+            setStatus("3D focus cleared.");
+          });
+      }
+
+      focusedNodeId = null;
+      graph3d.graphData(result.graphData);
+      update3DFocusStyles();
+      updateFocusStats();
+      updateNodeStatsPanel();
+      // Give the engine a moment to settle before fitting camera.
+      setTimeout(() => {
+        graph3d.zoomToFit(400, 40);
+      }, 250);
+    }
+
+    function render() {
+      if (!rawData) {
+        setStatus("Please pick a JSON file first.", true);
+        return;
+      }
+
+      const maxNodes = Number(maxNodesInput.value || 500);
+      const layoutName = layoutSelect.value;
+      const mode = modeSelect.value;
+
+      try {
+        const result = toElements(rawData, maxNodes);
+        activeGraphData = result.graphData;
+        neighborMap = buildNeighborMap(activeGraphData);
+        nodeStatsMap = calculateNodeStats(activeGraphData);
+        focusedNodeId = null;
+        updateFocusStats();
+        updateNodeStatsPanel();
+
+        if (mode === "3d") {
+          render3D(result);
+        } else {
+          render2D(result, layoutName);
+        }
+
+        const trimmed = result.nodeCount < result.fullNodeCount;
+        setStatus(
+          `Rendered (${mode.toUpperCase()}) ${result.nodeCount}/${result.fullNodeCount} nodes, ` +
+          `${result.edgeCount}/${result.fullEdgeCount} edges.` +
+          (trimmed ? " Increase Max nodes to see more." : "")
+        );
+      } catch (err) {
+        setStatus(`Render error: ${err.message}`, true);
+      }
+    }
+
+    fileInput.addEventListener("change", (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          rawData = JSON.parse(reader.result);
+          focusedNodeId = null;
+          activeGraphData = null;
+          nodeStatsMap = new Map();
+          updateFocusStats();
+          updateNodeStatsPanel();
+          setStatus(`Loaded ${file.name}. Click Render.`);
+        } catch (err) {
+          rawData = null;
+          focusedNodeId = null;
+          activeGraphData = null;
+          nodeStatsMap = new Map();
+          updateFocusStats();
+          updateNodeStatsPanel();
+          setStatus(`Invalid JSON: ${err.message}`, true);
+        }
+      };
+      reader.onerror = () => {
+        rawData = null;
+        focusedNodeId = null;
+        activeGraphData = null;
+        nodeStatsMap = new Map();
+        updateFocusStats();
+        updateNodeStatsPanel();
+        setStatus("Could not read file.", true);
+      };
+      reader.readAsText(file);
+    });
+
+    renderBtn.addEventListener("click", render);
+
+    fitBtn.addEventListener("click", () => {
+      if (modeSelect.value === "3d") {
+        if (graph3d) {
+          graph3d.zoomToFit(400, 40);
+        }
+        return;
+      }
+      cy.fit(undefined, 40);
+    });
+
+    cy.on("tap", "node", (evt) => {
+      const full = evt.target.data("full");
+      const id = evt.target.id();
+      if (focusedNodeId === id) {
+        clear2DFocus();
+        setStatus("2D focus cleared.");
+        return;
+      }
+      focusedNodeId = id;
+      apply2DFocus(id);
+      setStatus(`Focused (2D): ${full}`);
+    });
+
+    cy.on("tap", (evt) => {
+      if (evt.target === cy) {
+        clear2DFocus();
+        setStatus("2D focus cleared.");
+      }
+    });
+
+    cy.on("mouseover", "node", (evt) => {
+      const node = evt.target;
+      node.addClass("hover-label");
+      setStatus(`Hover (2D): ${node.data("full")}`);
+    });
+
+    cy.on("mouseout", "node", (evt) => {
+      const node = evt.target;
+      node.removeClass("hover-label");
+    });
+
+    // Keep scroll interactions inside the stats sheet.
+    nodeStatsPanelEl.addEventListener("wheel", (evt) => {
+      evt.stopPropagation();
+    }, { passive: true });
+
+    nodeStatsPanelEl.addEventListener("touchmove", (evt) => {
+      evt.stopPropagation();
+    }, { passive: true });
+  </script>
+</body>
+</html>
